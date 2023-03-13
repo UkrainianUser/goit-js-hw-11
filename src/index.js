@@ -16,6 +16,8 @@ const searchParams = new URLSearchParams({
 	page: 1,
 });
 
+let currentPage = 1;
+
 searchForm.addEventListener("submit", (event) => handleSubmit(event, input, searchParams));
 
 function setSearchParams(input, searchParams) {
@@ -47,7 +49,17 @@ function getImages(URL) {
         Notiflix.Notify.warning('Sorry, there are no images matching your search query. Please try again.');
       } else {
         galleryEl.innerHTML = renderGallery(images);
-				loadMoreBtn.style.display = 'block';
+        loadMoreBtn.style.display = 'block';
+        const totalHits = response.data.totalHits;
+        const currentPage = Number(searchParams.get('page'));
+        const perPage = Number(searchParams.get('per_page'));
+        const totalPages = Math.ceil(totalHits / perPage);
+        const displayedImages = (currentPage - 1) * perPage + images.length;
+        if (displayedImages >= totalHits) {
+          loadMoreBtn.style.display = 'none';
+          Notiflix.Notify.info("We're sorry, but you've reached the end of search results.");
+        }
+        console.log(totalHits);
       }
       
       return images;
@@ -61,14 +73,27 @@ function getImages(URL) {
 function handleSubmit(event, input, searchParams) {
   event.preventDefault();
 
+  if (input.value !== searchParams.get('q')) {
+    searchParams.set('q', input.value);
+    searchParams.set('page', 1);
+    currentPage = 1;
+    galleryEl.innerHTML = '';
+    loadMoreBtn.style.display = 'none';
+  }
+
   setSearchParams(input, searchParams);
   const URL = getURL(searchParams);
-  // clearInput(input);
   getImages(URL)
-    .then(img => console.log(img))
-    .catch((error) => console.log(error));
+    .then(images => {
+      galleryEl.innerHTML = renderGallery(images);
+      if (images.length === 0) {
+        loadMoreBtn.style.display = 'none';
+      } else {
+        loadMoreBtn.style.display = 'block';
+      }
+    })
+    .catch(error => console.log(error));
 }
-
 
 function renderGallery(images) {
   const markup = images.map((image) => `<div class="photo-card">
@@ -95,3 +120,19 @@ function renderGallery(images) {
 
   return markup;
 };
+
+loadMoreBtn.addEventListener('click', loadMoreImages);
+
+function loadMoreImages() {
+  currentPage += 1;
+  searchParams.set('page', currentPage);
+  const URL = getURL(searchParams);
+  getImages(URL)
+    .then(images => {
+      galleryEl.insertAdjacentHTML('beforeend', renderGallery(images));
+      if (images.length < 40) {
+        loadMoreBtn.style.display = 'none';
+      }
+    })
+    .catch(error => console.log(error));
+}
